@@ -87,7 +87,7 @@ class GIFAnimatedImage {
             if frameCount == 1 {
                 gifDuration = .infinity
             } else {
-                // Get current animated GIF frame duration
+                // Get current animated GIF or APNG frame duration
                 gifDuration += GIFAnimatedImage.getFrameDuration(from: imageSource, at: i)
             }
             images.append(KingfisherWrapper.image(cgImage: imageRef, scale: options.scale, refImage: nil))
@@ -110,12 +110,26 @@ class GIFAnimatedImage {
         return frameDuration.doubleValue > 0.011 ? frameDuration.doubleValue : defaultFrameDuration
     }
 
+    // Calculates frame duration for a ANPG frame out of the kCGImagePropertyPNGDictionary dictionary.
+    static func getAPNGFrameDuration(from pngInfo: [String: Any]?) -> TimeInterval {
+        let defaultFrameDuration = 0.1
+        guard let pngInfo = pngInfo else { return defaultFrameDuration }
+
+        let unclampedDelayTime = pngInfo[kCGImagePropertyAPNGUnclampedDelayTime as String] as? NSNumber
+        let delayTime = pngInfo[kCGImagePropertyAPNGDelayTime as String] as? NSNumber
+        let duration = unclampedDelayTime ?? delayTime
+
+        guard let frameDuration = duration else { return defaultFrameDuration }
+        return frameDuration.doubleValue > 0.011 ? frameDuration.doubleValue : defaultFrameDuration
+    }
+
     // Calculates frame duration at a specific index for a gif from an `imageSource`.
     static func getFrameDuration(from imageSource: CGImageSource, at index: Int) -> TimeInterval {
         guard let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, index, nil)
             as? [String: Any] else { return 0.0 }
 
         let gifInfo = properties[kCGImagePropertyGIFDictionary as String] as? [String: Any]
-        return getFrameDuration(from: gifInfo)
+        let pngInfo = properties[kCGImagePropertyPNGDictionary as String] as? [String: Any]
+        return gifInfo == nil ? getAPNGFrameDuration(from: pngInfo) : getFrameDuration(from: gifInfo)
     }
 }
